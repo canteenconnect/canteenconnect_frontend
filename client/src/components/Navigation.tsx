@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
+import { ThemeToggle } from "./ThemeToggle";
+
 export function Navigation() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
@@ -72,6 +74,7 @@ export function Navigation() {
       </div>
 
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <Link href="/cart">
           <Button variant="ghost" size="icon" className="relative">
             <ShoppingBag className="w-5 h-5" />
@@ -119,10 +122,14 @@ export function Navigation() {
   // Mobile Bottom Bar
   const MobileNav = () => (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-lg border-t border-border z-50 pb-safe">
-      <div className="grid grid-cols-4 gap-1 p-2">
+      <div className="grid grid-cols-5 gap-1 p-2">
         <NavIcon path="/" icon={Home} label="Home" />
         <NavIcon path="/search" icon={Search} label="Search" />
         <NavIcon path="/cart" icon={ShoppingBag} label="Cart" badge={itemCount} />
+        <div className="flex flex-col items-center justify-center">
+           <ThemeToggle />
+           <span className="text-[10px] text-muted-foreground">Theme</span>
+        </div>
         {user ? (
           <NavIcon path="/profile" icon={User} label="Profile" />
         ) : (

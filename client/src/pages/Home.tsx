@@ -2,14 +2,17 @@ import { useState } from "react";
 import { useProducts } from "@/hooks/use-products";
 import { ProductCard } from "@/components/ProductCard";
 import { CategoryFilter } from "@/components/CategoryFilter";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, Leaf } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export default function Home() {
   const { data: products, isLoading, error } = useProducts();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [vegOnly, setVegOnly] = useState(false);
 
   if (isLoading) {
     return (
@@ -31,11 +34,19 @@ export default function Home() {
     ? Array.from(new Set(products.map((p) => p.category)))
     : [];
 
+  const isVegetarian = (product: any) => {
+    const nonVegKeywords = ["chicken", "meat", "fish", "egg", "beef", "mutton", "biryani"];
+    const content = (product.name + product.description).toLowerCase();
+    // Simple heuristic: if it mentions meat keywords, it's non-veg
+    return !nonVegKeywords.some(keyword => content.includes(keyword));
+  };
+
   const filteredProducts = products?.filter((product) => {
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           product.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    const matchesVeg = !vegOnly || isVegetarian(product);
+    return matchesCategory && matchesSearch && matchesVeg;
   });
 
   return (
@@ -77,13 +88,25 @@ export default function Home() {
           />
         </motion.div>
 
-        {/* Categories */}
-        <div className="mb-8">
-          <CategoryFilter 
-            categories={categories} 
-            selected={selectedCategory} 
-            onSelect={setSelectedCategory} 
-          />
+        {/* Filter Controls */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div className="flex-1 min-w-0">
+            <CategoryFilter 
+              categories={categories} 
+              selected={selectedCategory} 
+              onSelect={setSelectedCategory} 
+            />
+          </div>
+          <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-full border border-border/50 shadow-sm self-start">
+            <Leaf className={`w-4 h-4 ${vegOnly ? "text-green-500" : "text-muted-foreground"}`} />
+            <Label htmlFor="veg-only" className="text-sm font-medium cursor-pointer">Veg Only</Label>
+            <Switch 
+              id="veg-only" 
+              checked={vegOnly} 
+              onCheckedChange={setVegOnly}
+              data-testid="switch-veg-only"
+            />
+          </div>
         </div>
 
         {/* Product Grid */}
