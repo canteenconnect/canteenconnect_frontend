@@ -14,6 +14,25 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [vegOnly, setVegOnly] = useState(false);
 
+  // Moved heuristic before it's used
+  const isVegetarian = (product: any) => {
+    const nonVegKeywords = ["chicken", "meat", "fish", "egg", "beef", "mutton", "biryani"];
+    const content = (product.name + product.description).toLowerCase();
+    return !nonVegKeywords.some(keyword => content.includes(keyword));
+  };
+
+  const categories = products 
+    ? Array.from(new Set(products.map((p) => p.category)))
+    : [];
+
+  const filteredProducts = products?.filter((product) => {
+    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          product.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesVeg = !vegOnly || isVegetarian(product);
+    return matchesCategory && matchesSearch && matchesVeg;
+  });
+
   if (isLoading) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
@@ -29,25 +48,6 @@ export default function Home() {
       </div>
     );
   }
-
-  const categories = products 
-    ? Array.from(new Set(products.map((p) => p.category)))
-    : [];
-
-  const isVegetarian = (product: any) => {
-    const nonVegKeywords = ["chicken", "meat", "fish", "egg", "beef", "mutton", "biryani"];
-    const content = (product.name + product.description).toLowerCase();
-    // Simple heuristic: if it mentions meat keywords, it's non-veg
-    return !nonVegKeywords.some(keyword => content.includes(keyword));
-  };
-
-  const filteredProducts = products?.filter((product) => {
-    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesVeg = !vegOnly || isVegetarian(product);
-    return matchesCategory && matchesSearch && matchesVeg;
-  });
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-8">
