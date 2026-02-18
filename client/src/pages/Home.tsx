@@ -7,19 +7,13 @@ import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 export default function Home() {
   const { data: products, isLoading, error } = useProducts();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [vegOnly, setVegOnly] = useState(false);
-
-  // Moved heuristic before it's used
-  const isVegetarian = (product: any) => {
-    const nonVegKeywords = ["chicken", "meat", "fish", "egg", "beef", "mutton", "biryani"];
-    const content = (product.name + product.description).toLowerCase();
-    return !nonVegKeywords.some(keyword => content.includes(keyword));
-  };
 
   const categories = products
     ? Array.from(new Set(products.map((p) => p.category)))
