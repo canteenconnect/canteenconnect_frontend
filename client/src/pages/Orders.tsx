@@ -126,7 +126,7 @@ export default function Orders() {
                   
                   <div className="flex justify-between items-center pt-2 border-t border-border/50 mt-4">
                     <span className="font-semibold text-muted-foreground">Total Amount</span>
-                    <span className="text-xl font-bold text-primary">${parseFloat(order.total).toFixed(2)}</span>
+                    <span className="text-xl font-bold text-primary">₹{parseFloat(order.total).toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>

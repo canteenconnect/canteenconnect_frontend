@@ -56,7 +56,7 @@ export function ProductCard({ product }: ProductCardProps) {
               {product.name}
             </h3>
             <span className="font-semibold text-primary whitespace-nowrap">
-              ${parseFloat(product.price).toFixed(2)}
+              ₹{parseFloat(product.price).toFixed(2)}
             </span>
           </div>
           <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">

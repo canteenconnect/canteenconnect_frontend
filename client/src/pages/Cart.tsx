@@ -76,7 +76,7 @@ export default function Cart() {
 
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-lg truncate">{item.name}</h3>
-                <p className="text-primary font-medium">${parseFloat(item.price).toFixed(2)}</p>
+                <p className="text-primary font-medium">₹{parseFloat(item.price).toFixed(2)}</p>
               </div>
 
               <div className="flex items-center gap-3 bg-muted/50 rounded-lg p-1">
@@ -110,7 +110,7 @@ export default function Cart() {
         <div className="max-w-2xl mx-auto space-y-4">
           <div className="flex justify-between items-center text-lg font-bold">
             <span>Total</span>
-            <span className="text-2xl text-primary">${total.toFixed(2)}</span>
+            <span className="text-2xl text-primary">₹{total.toFixed(2)}</span>
           </div>
           <Button 
             size="lg" 
