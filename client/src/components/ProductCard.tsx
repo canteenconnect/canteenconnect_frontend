@@ -26,8 +26,11 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="group relative bg-card rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-border/50"
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      whileHover={{ y: -5 }}
+      transition={{ duration: 0.3 }}
+      className="group relative bg-card rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-border/50"
     >
       <div className="aspect-[4/3] overflow-hidden bg-muted relative">
         {/* Descriptive alt text for accessibility */}

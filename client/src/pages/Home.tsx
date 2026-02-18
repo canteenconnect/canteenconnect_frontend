@@ -21,9 +21,17 @@ export default function Home() {
     return !nonVegKeywords.some(keyword => content.includes(keyword));
   };
 
-  const categories = products 
+  const categories = products
     ? Array.from(new Set(products.map((p) => p.category)))
     : [];
+
+  const trendingProducts = products?.slice(0, 3) || [];
+
+  const isVegetarian = (product: any) => {
+    const nonVegKeywords = ["chicken", "meat", "fish", "egg", "beef", "mutton", "biryani"];
+    const content = (product.name + product.description).toLowerCase();
+    return !nonVegKeywords.some(keyword => content.includes(keyword));
+  };
 
   const filteredProducts = products?.filter((product) => {
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
@@ -72,6 +80,19 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 max-w-5xl -mt-6">
+        {/* Trending Section */}
+        <section className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-display font-bold">Trending Now</h2>
+            <Badge variant="secondary" className="bg-primary/10 text-primary border-none">Chef's Choice</Badge>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {trendingProducts.map((product) => (
+              <ProductCard key={`trending-${product.id}`} product={product} />
+            ))}
+          </div>
+        </section>
+
         {/* Search Bar */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}

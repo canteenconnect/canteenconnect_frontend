@@ -46,6 +46,52 @@ export default function Orders() {
     }
   };
 
+  const getStatusStep = (status: string) => {
+    const steps = ["pending", "preparing", "ready", "completed"];
+    return steps.indexOf(status);
+  };
+
+  const OrderTimeline = ({ status }: { status: string }) => {
+    const steps = [
+      { id: "pending", label: "Pending", icon: Clock },
+      { id: "preparing", label: "Preparing", icon: Package },
+      { id: "ready", label: "Ready", icon: CheckCircle2 },
+      { id: "completed", label: "Completed", icon: CheckCircle2 },
+    ];
+    
+    if (status === "cancelled") return null;
+    
+    const currentStep = getStatusStep(status);
+
+    return (
+      <div className="relative flex justify-between items-center w-full mt-6 mb-2 px-2">
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-muted -translate-y-1/2 z-0" />
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          const isCompleted = index <= currentStep;
+          const isCurrent = index === currentStep;
+          
+          return (
+            <div key={step.id} className="relative z-10 flex flex-col items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors duration-300 ${
+                isCompleted 
+                  ? "bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20" 
+                  : "bg-background border-muted text-muted-foreground"
+              } ${isCurrent ? "ring-4 ring-primary/20 scale-110" : ""}`}>
+                <Icon className="w-4 h-4" />
+              </div>
+              <span className={`text-[10px] font-bold mt-2 uppercase tracking-wider ${
+                isCompleted ? "text-primary" : "text-muted-foreground"
+              }`}>
+                {step.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto px-4 max-w-3xl py-8 mb-20">
       <h1 className="text-3xl font-display font-bold mb-8">My Orders</h1>
@@ -76,13 +122,8 @@ export default function Orders() {
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="space-y-4">
-                  {/* Since order items aren't strictly typed in the list response by default based on schema,
-                      we assume backend might join them or fetch them. 
-                      If API returns items, map them. If not, showing total is fallback.
-                      For this demo, assuming standard relational join from backend.
-                  */}
+                  <OrderTimeline status={order.status} />
                   
-                  {/* Placeholder for items if backend joins them, otherwise just summary */}
                   <div className="flex justify-between items-center pt-2 border-t border-border/50 mt-4">
                     <span className="font-semibold text-muted-foreground">Total Amount</span>
                     <span className="text-xl font-bold text-primary">${parseFloat(order.total).toFixed(2)}</span>
