@@ -1,26 +1,62 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
+import { ensureStudentAccessToken } from "@/lib/api/client";
+import { clearAccessToken, setAccessToken } from "@/lib/api/tokenStore";
 
 type LoginInput = z.infer<typeof api.auth.login.input>;
 type RegisterInput = z.infer<typeof api.auth.register.input>;
 type User = z.infer<typeof api.auth.me.responses[200]>;
+type AuthUser = z.infer<typeof api.auth.login.responses[200]>;
+
+async function extractApiErrorMessage(
+  response: Response,
+  fallbackMessage: string,
+) {
+  try {
+    const payload = (await response.json()) as { message?: unknown };
+    if (typeof payload?.message === "string" && payload.message.trim()) {
+      return payload.message;
+    }
+  } catch {
+    // Ignore malformed/non-JSON error payloads and return fallback below.
+  }
+
+  return fallbackMessage;
+}
+
+function toPublicUser(user: AuthUser | User): User {
+  const { accessToken: _accessToken, ...safeUser } = user as AuthUser & {
+    accessToken?: string;
+  };
+  return safeUser as User;
+}
 
 export function useAuth() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: user, isLoading, error } = useQuery<User>({
+  const { data: user, isLoading, error } = useQuery<User | null>({
     queryKey: [api.auth.me.path],
     queryFn: async () => {
-      const res = await fetch(api.auth.me.path);
+      const res = await fetch(api.auth.me.path, { credentials: "include" });
       if (res.status === 401) return null;
-      if (!res.ok) throw new Error("Failed to fetch user");
-      return await res.json();
+      if (!res.ok) return null;
+      return api.auth.me.responses[200].parse(await res.json());
     },
     retry: false,
   });
+
+  useEffect(() => {
+    if (!user || user.role !== "student") {
+      clearAccessToken();
+      return;
+    }
+
+    void ensureStudentAccessToken();
+  }, [user?.id, user?.role]);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginInput) => {
@@ -28,23 +64,32 @@ export function useAuth() {
         method: api.auth.login.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
+        credentials: "include",
       });
 
       if (!res.ok) {
-        // Try to parse error message if available
-        try {
-          const error = await res.json();
-          throw new Error(error.message || "Login failed");
-        } catch (e) {
-          throw new Error("Invalid username or password");
-        }
+        const message = await extractApiErrorMessage(
+          res,
+          "Invalid username or password",
+        );
+        throw new Error(message);
       }
-      return await res.json();
+
+      return api.auth.login.responses[200].parse(await res.json());
     },
     onSuccess: (data) => {
-      queryClient.setQueryData([api.auth.me.path], data);
+      queryClient.setQueryData([api.auth.me.path], toPublicUser(data));
+
+      if (data.role === "student") {
+        if (data.accessToken) {
+          setAccessToken(data.accessToken);
+        } else {
+          void ensureStudentAccessToken();
+        }
+      }
+
       toast({
-        title: "Welcome back!",
+        title: "Welcome back",
         description: `Logged in as ${data.username}`,
       });
     },
@@ -58,27 +103,34 @@ export function useAuth() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: RegisterInput) => {
+    mutationFn: async (payload: RegisterInput) => {
       const res = await fetch(api.auth.register.path, {
         method: api.auth.register.method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
+        credentials: "include",
       });
 
       if (!res.ok) {
-        try {
-          const error = await res.json();
-          throw new Error(error.message || "Registration failed");
-        } catch (e) {
-          throw new Error("Registration failed");
-        }
+        const message = await extractApiErrorMessage(res, "Registration failed");
+        throw new Error(message);
       }
-      return await res.json();
+
+      return api.auth.register.responses[201].parse(await res.json());
     },
     onSuccess: (data) => {
-      queryClient.setQueryData([api.auth.me.path], data);
+      queryClient.setQueryData([api.auth.me.path], toPublicUser(data));
+
+      if (data.role === "student") {
+        if (data.accessToken) {
+          setAccessToken(data.accessToken);
+        } else {
+          void ensureStudentAccessToken();
+        }
+      }
+
       toast({
-        title: "Account created!",
+        title: "Account created",
         description: "Welcome to Canteen Connect",
       });
     },
@@ -93,14 +145,18 @@ export function useAuth() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await fetch(api.auth.logout.path, { method: api.auth.logout.method });
+      await fetch(api.auth.logout.path, {
+        method: api.auth.logout.method,
+        credentials: "include",
+      });
     },
     onSuccess: () => {
+      clearAccessToken();
       queryClient.setQueryData([api.auth.me.path], null);
-      queryClient.clear(); // Clear all data on logout
+      queryClient.clear();
       toast({
         title: "Logged out",
-        description: "See you soon!",
+        description: "See you soon.",
       });
     },
   });

@@ -9,7 +9,10 @@ export function useOrders() {
   return useQuery({
     queryKey: [api.orders.list.path],
     queryFn: async () => {
-      const res = await fetch(api.orders.list.path);
+      const res = await fetch(api.orders.list.path, {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
       if (!res.ok) throw new Error("Failed to fetch orders");
       return api.orders.list.responses[200].parse(await res.json());
     },
@@ -26,6 +29,7 @@ export function useCreateOrder() {
         method: api.orders.create.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
+        credentials: "include",
       });
 
       if (!res.ok) {

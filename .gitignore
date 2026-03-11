@@ -4,3 +4,9 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+.vercel
+.local/
+test-results/
+e2e/
+playwright-*.png
+.tmp_home.html

@@ -9,8 +9,18 @@ export interface CartItem extends Product {
 // In a larger app, this would use Context or Redux/Zustand
 export function useCart() {
   const [items, setItems] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem("canteen-cart");
-    return saved ? JSON.parse(saved) : [];
+    if (typeof window === "undefined") {
+      return [];
+    }
+
+    try {
+      const saved = localStorage.getItem("canteen-cart");
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      localStorage.removeItem("canteen-cart");
+      return [];
+    }
   });
 
   useEffect(() => {

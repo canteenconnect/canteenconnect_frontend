@@ -1,9 +1,10 @@
-import { Plus } from "lucide-react";
+﻿import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { type Product } from "@shared/schema";
 import { useCart } from "@/hooks/use-cart";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { formatCurrencyINR } from "@/lib/utils";
 
 interface ProductCardProps {
   product: Product;
@@ -30,9 +31,9 @@ export function ProductCard({ product }: ProductCardProps) {
       viewport={{ once: true }}
       whileHover={{ y: -5 }}
       transition={{ duration: 0.3 }}
-      className="group relative bg-card rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-border/50"
+      className="group relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 transition-all duration-300 hover:shadow-xl"
     >
-      <div className="aspect-[4/3] overflow-hidden bg-muted relative">
+      <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
         {/* Descriptive alt text for accessibility */}
         {/* Using placeholder as per instructions since we don't have real images yet */}
         <img
@@ -41,8 +42,8 @@ export function ProductCard({ product }: ProductCardProps) {
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
         {!product.available && (
-          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center">
-            <span className="bg-destructive text-destructive-foreground px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/70 backdrop-blur-sm">
+            <span className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-bold text-zinc-950 shadow-lg">
               Sold Out
             </span>
           </div>
@@ -52,14 +53,14 @@ export function ProductCard({ product }: ProductCardProps) {
       <div className="p-4 space-y-3">
         <div className="space-y-1">
           <div className="flex justify-between items-start gap-2">
-            <h3 className="font-display font-bold text-lg leading-tight group-hover:text-primary transition-colors">
+            <h3 className="text-lg font-display font-bold leading-tight text-zinc-100 transition-colors group-hover:text-zinc-300">
               {product.name}
             </h3>
-            <span className="font-semibold text-primary whitespace-nowrap">
-              ₹{parseFloat(product.price).toFixed(2)}
+            <span className="whitespace-nowrap font-semibold text-zinc-200">
+              {formatCurrencyINR(product.price)}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+          <p className="line-clamp-2 text-sm leading-relaxed text-zinc-400">
             {product.description}
           </p>
         </div>
@@ -68,7 +69,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <Button
             onClick={handleAdd}
             disabled={!product.available}
-            className="w-full rounded-xl h-10 font-semibold shadow-md shadow-primary/10 hover:shadow-primary/20"
+            className="h-10 w-full rounded-xl bg-zinc-100 font-semibold text-zinc-950 hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500"
             size="sm"
           >
             {product.available ? (
