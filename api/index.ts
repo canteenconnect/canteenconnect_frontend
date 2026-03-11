@@ -1,10 +1,7 @@
 import express, { type Request, type Response } from "express";
-import { serveStatic } from "./static.js";
-import { createServer } from "http";
-import { proxyApiRequest } from "./upstreamProxy.js";
+import { proxyApiRequest } from "../server/upstreamProxy.js";
 
 const app = express();
-const httpServer = createServer(app);
 app.disable("x-powered-by");
 
 const allowedOrigins = (process.env.CORS_ORIGINS ??
@@ -62,12 +59,6 @@ function applySecurityHeaders(res: Response) {
   }
 }
 
-declare module "http" {
-  interface IncomingMessage {
-    rawBody: unknown;
-  }
-}
-
 app.use(
   express.json({
     limit: "1mb",
@@ -76,8 +67,8 @@ app.use(
     },
   }),
 );
-
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
+
 app.use((req, res, next) => {
   applySecurityHeaders(res);
   applyCors(req.headers.origin, res);
@@ -87,73 +78,22 @@ app.use((req, res, next) => {
   next();
 });
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
-
-app.use((req, res, next) => {
-  const start = Date.now();
-  const requestPath = req.path;
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (requestPath.startsWith("/api")) {
-      log(`${req.method} ${requestPath} ${res.statusCode} in ${duration}ms`);
-    }
-  });
-
-  next();
-});
-
-app.get("/health", (_req, res) => {
-  res.json({
+app.get("/api/index", (_req, res) => {
+  res.status(200).json({
     success: true,
-    message: "Proxy server healthy",
-    data: {
-      status: "ok",
-      backendUrl:
-        process.env.BACKEND_API_URL ||
-        process.env.VITE_BACKEND_URL ||
-        "https://canteenconnect-backend.onrender.com",
-    },
+    message: "Proxy function healthy",
+    data: { status: "ok" },
   });
 });
 
-app.use("/api", (req, res) => {
-  void proxyApiRequest(req as Request & { rawBody?: unknown }, res);
+app.use((req, res) => {
+  const originalPath = req.originalUrl || req.url;
+  const apiPath = originalPath.startsWith("/api/index")
+    ? originalPath.replace("/api/index", "/api")
+    : originalPath;
+  void proxyApiRequest(req as Request & { rawBody?: unknown }, res, apiPath);
 });
 
-(async () => {
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite.js");
-    await setupVite(httpServer, app);
-  }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
-})();
+export default async function handler(req: Request, res: Response) {
+  return app(req, res);
+}
