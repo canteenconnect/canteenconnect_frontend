@@ -33,8 +33,8 @@ const userSchema = z.object({
   department: z.string().nullable().optional(),
   profileImage: z.string().nullable().optional(),
   dietaryPreference: z.enum(dietaryPreferences),
-  createdAt: z.string().datetime().or(z.date()).optional(),
-  updatedAt: z.string().datetime().or(z.date()).optional(),
+  createdAt: z.string().datetime().or(z.date()).nullable().optional(),
+  updatedAt: z.string().datetime().or(z.date()).nullable().optional(),
 });
 
 const authUserSchema = userSchema.extend({
