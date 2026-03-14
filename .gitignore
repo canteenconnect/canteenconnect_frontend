@@ -7,6 +7,5 @@ vite.config.ts.*
 .vercel
 .local/
 test-results/
-e2e/
 playwright-*.png
 .tmp_home.html
