@@ -41,6 +41,25 @@ const authUserSchema = userSchema.extend({
   accessToken: z.string().optional(),
 });
 
+const backendUserSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  role: z.string().nullable().optional(),
+  roll_number: z.string().nullable().optional(),
+  department: z.string().nullable().optional(),
+  avatar_url: z.string().nullable().optional(),
+  created_at: z.string().datetime().or(z.date()).nullable().optional(),
+  updated_at: z.string().datetime().or(z.date()).nullable().optional(),
+});
+
+const googleAuthResponseSchema = z.object({
+  user: backendUserSchema,
+  access_token: z.string(),
+  refresh_token: z.string(),
+});
+
 const productSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -191,6 +210,21 @@ export const api = {
       responses: {
         200: apiSuccess(z.object({ accessToken: z.string() })),
         401: apiErrorSchema,
+      },
+    },
+    google: {
+      method: "POST" as const,
+      path: "/api/auth/google",
+      input: z.object({
+        credential: z.string().min(20),
+      }),
+      responses: {
+        200: googleAuthResponseSchema,
+        201: googleAuthResponseSchema,
+        400: apiErrorSchema,
+        401: apiErrorSchema,
+        403: apiErrorSchema,
+        409: apiErrorSchema,
       },
     },
   },

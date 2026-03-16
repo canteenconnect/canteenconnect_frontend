@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation, Link } from "wouter";
+import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -27,13 +29,17 @@ const registerSchema = z
   });
 
 export default function Register() {
-  const { register, isRegistering, user } = useAuth();
+  const { register, loginWithGoogle, isRegistering, isGoogleLoggingIn, user } = useAuth();
   const [, setLocation] = useLocation();
+  const isAuthenticating = isRegistering || isGoogleLoggingIn;
 
-  if (user) {
-    setLocation("/");
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      setLocation("/");
+    }
+  }, [setLocation, user]);
+
+  if (user) return null;
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -120,7 +126,11 @@ export default function Register() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="h-11 w-full rounded-xl text-base font-semibold" disabled={isRegistering}>
+                <Button
+                  type="submit"
+                  className="h-11 w-full rounded-xl text-base font-semibold"
+                  disabled={isAuthenticating}
+                >
                   {isRegistering ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -130,6 +140,21 @@ export default function Register() {
                     "Register"
                   )}
                 </Button>
+
+                <div className="relative py-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border/60" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    <span className="bg-card px-3">Or create with</span>
+                  </div>
+                </div>
+
+                <GoogleAuthButton
+                  text="signup_with"
+                  disabled={isAuthenticating}
+                  onCredential={loginWithGoogle}
+                />
               </form>
             </Form>
           </CardContent>

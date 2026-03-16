@@ -10,6 +10,7 @@ type LoginInput = z.infer<typeof api.auth.login.input>;
 type RegisterInput = z.infer<typeof api.auth.register.input>;
 type User = z.infer<typeof api.auth.me.responses[200]>;
 type AuthUser = z.infer<typeof api.auth.login.responses[200]>;
+type GoogleAuthResponse = z.infer<typeof api.auth.google.responses[200]>;
 
 async function extractApiErrorMessage(
   response: Response,
@@ -32,6 +33,35 @@ function toPublicUser(user: AuthUser | User): User {
     accessToken?: string;
   };
   return safeUser as User;
+}
+
+function normalizeRole(role: string | null | undefined): User["role"] {
+  const normalized = (role || "").trim().toLowerCase();
+  if (normalized === "vendor") return "vendor";
+  if (normalized === "admin" || normalized === "super_admin") return "admin";
+  return "student";
+}
+
+function toAuthUserFromGoogle(payload: GoogleAuthResponse): AuthUser {
+  const email = payload.user.email ?? null;
+  const username = email ? email.split("@")[0] : `user${payload.user.id}`;
+
+  return {
+    id: payload.user.id,
+    username,
+    role: normalizeRole(payload.user.role),
+    name: payload.user.name,
+    fullName: payload.user.name,
+    email,
+    phoneNumber: payload.user.phone ?? null,
+    collegeId: payload.user.roll_number ?? null,
+    department: payload.user.department ?? null,
+    profileImage: payload.user.avatar_url ?? null,
+    dietaryPreference: "both",
+    createdAt: payload.user.created_at ?? null,
+    updatedAt: payload.user.updated_at ?? null,
+    accessToken: payload.access_token,
+  };
 }
 
 export function useAuth() {
@@ -58,6 +88,23 @@ export function useAuth() {
     void ensureStudentAccessToken();
   }, [user?.id, user?.role]);
 
+  function handleAuthSuccess(data: AuthUser, title: string, description: string) {
+    queryClient.setQueryData([api.auth.me.path], toPublicUser(data));
+
+    if (data.role === "student") {
+      if (data.accessToken) {
+        setAccessToken(data.accessToken);
+      } else {
+        void ensureStudentAccessToken();
+      }
+    }
+
+    toast({
+      title,
+      description,
+    });
+  }
+
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginInput) => {
       const res = await fetch(api.auth.login.path, {
@@ -78,20 +125,7 @@ export function useAuth() {
       return api.auth.login.responses[200].parse(await res.json());
     },
     onSuccess: (data) => {
-      queryClient.setQueryData([api.auth.me.path], toPublicUser(data));
-
-      if (data.role === "student") {
-        if (data.accessToken) {
-          setAccessToken(data.accessToken);
-        } else {
-          void ensureStudentAccessToken();
-        }
-      }
-
-      toast({
-        title: "Welcome back",
-        description: `Logged in as ${data.username}`,
-      });
+      handleAuthSuccess(data, "Welcome back", `Logged in as ${data.username}`);
     },
     onError: (error: Error) => {
       toast({
@@ -119,24 +153,43 @@ export function useAuth() {
       return api.auth.register.responses[201].parse(await res.json());
     },
     onSuccess: (data) => {
-      queryClient.setQueryData([api.auth.me.path], toPublicUser(data));
-
-      if (data.role === "student") {
-        if (data.accessToken) {
-          setAccessToken(data.accessToken);
-        } else {
-          void ensureStudentAccessToken();
-        }
-      }
-
-      toast({
-        title: "Account created",
-        description: "Welcome to Canteen Connect",
-      });
+      handleAuthSuccess(data, "Account created", "Welcome to Canteen Connect");
     },
     onError: (error: Error) => {
       toast({
         title: "Registration failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const googleLoginMutation = useMutation({
+    mutationFn: async (credential: string) => {
+      const res = await fetch(api.auth.google.path, {
+        method: api.auth.google.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential }),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const message = await extractApiErrorMessage(res, "Google sign-in failed");
+        throw new Error(message);
+      }
+
+      if (res.status === 201) {
+        return toAuthUserFromGoogle(api.auth.google.responses[201].parse(await res.json()));
+      }
+
+      return toAuthUserFromGoogle(api.auth.google.responses[200].parse(await res.json()));
+    },
+    onSuccess: (data) => {
+      handleAuthSuccess(data, "Google sign-in successful", `Logged in as ${data.username}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Google sign-in failed",
         description: error.message,
         variant: "destructive",
       });
@@ -169,6 +222,8 @@ export function useAuth() {
     isLoggingIn: loginMutation.isPending,
     register: registerMutation.mutate,
     isRegistering: registerMutation.isPending,
+    loginWithGoogle: googleLoginMutation.mutate,
+    isGoogleLoggingIn: googleLoginMutation.isPending,
     logout: logoutMutation.mutate,
   };
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation, Link } from "wouter";
+import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,9 +31,10 @@ const loginSchema = z.object({
 });
 
 export default function Login() {
-  const { login, isLoggingIn, user } = useAuth();
+  const { login, loginWithGoogle, isLoggingIn, isGoogleLoggingIn, user } = useAuth();
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
+  const isAuthenticating = isLoggingIn || isGoogleLoggingIn;
 
   useEffect(() => {
     if (user) {
@@ -146,7 +148,7 @@ export default function Login() {
                 <Button
                   type="submit"
                   className="h-11 w-full rounded-xl text-base font-semibold"
-                  disabled={isLoggingIn || !form.formState.isValid}
+                  disabled={isAuthenticating || !form.formState.isValid}
                 >
                   {isLoggingIn ? (
                     <>
@@ -157,6 +159,21 @@ export default function Login() {
                     "Sign In"
                   )}
                 </Button>
+
+                <div className="relative py-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border/60" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    <span className="bg-card px-3">Or continue with</span>
+                  </div>
+                </div>
+
+                <GoogleAuthButton
+                  text="signin_with"
+                  disabled={isAuthenticating}
+                  onCredential={loginWithGoogle}
+                />
               </form>
             </Form>
           </CardContent>
