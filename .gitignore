@@ -9,3 +9,5 @@ vite.config.ts.*
 test-results/
 playwright-*.png
 .tmp_home.html
+
+.vercel
