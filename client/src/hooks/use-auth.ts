@@ -1,129 +1,112 @@
-import { useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
-import { api } from "@shared/routes";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { ensureStudentAccessToken } from "@/lib/api/client";
-import { clearAccessToken, setAccessToken } from "@/lib/api/tokenStore";
+import { withApiOrigin } from "@/lib/api/base";
+import {
+  backendTokenSchema,
+  backendUserSchema,
+  mapBackendTokenToSessionUser,
+  mapBackendUserToSessionUser,
+  type SessionUser,
+} from "@/lib/api/fastapiAdapters";
+import { clearAccessToken, getAccessToken, setAccessToken } from "@/lib/api/tokenStore";
 
-type LoginInput = z.infer<typeof api.auth.login.input>;
-type RegisterInput = z.infer<typeof api.auth.register.input>;
-type User = z.infer<typeof api.auth.me.responses[200]>;
-type AuthUser = z.infer<typeof api.auth.login.responses[200]>;
-type GoogleAuthResponse = z.infer<typeof api.auth.google.responses[200]>;
+type LoginInput = {
+  username: string;
+  password: string;
+};
+
+type RegisterInput = {
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+  role: "student";
+};
 
 async function extractApiErrorMessage(
   response: Response,
   fallbackMessage: string,
 ) {
   try {
-    const payload = (await response.json()) as { message?: unknown };
+    const payload = (await response.json()) as { detail?: unknown; message?: unknown };
+    if (typeof payload?.detail === "string" && payload.detail.trim()) {
+      return payload.detail;
+    }
     if (typeof payload?.message === "string" && payload.message.trim()) {
       return payload.message;
     }
   } catch {
-    // Ignore malformed/non-JSON error payloads and return fallback below.
+    // Ignore malformed responses and fall back below.
   }
 
   return fallbackMessage;
 }
 
-function toPublicUser(user: AuthUser | User): User {
-  const { accessToken: _accessToken, ...safeUser } = user as AuthUser & {
-    accessToken?: string;
-  };
-  return safeUser as User;
-}
+async function loginAgainstBackend(credentials: LoginInput): Promise<SessionUser> {
+  const body = new URLSearchParams({
+    username: credentials.username,
+    password: credentials.password,
+  });
 
-function normalizeRole(role: string | null | undefined): User["role"] {
-  const normalized = (role || "").trim().toLowerCase();
-  if (normalized === "vendor") return "vendor";
-  if (normalized === "admin" || normalized === "super_admin") return "admin";
-  return "student";
-}
+  const response = await fetch(withApiOrigin("/token"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body,
+  });
 
-function toAuthUserFromGoogle(payload: GoogleAuthResponse): AuthUser {
-  const email = payload.user.email ?? null;
-  const username = email ? email.split("@")[0] : `user${payload.user.id}`;
+  if (!response.ok) {
+    throw new Error(await extractApiErrorMessage(response, "Invalid username or password"));
+  }
 
-  return {
-    id: payload.user.id,
-    username,
-    role: normalizeRole(payload.user.role),
-    name: payload.user.name,
-    fullName: payload.user.name,
-    email,
-    phoneNumber: payload.user.phone ?? null,
-    collegeId: payload.user.roll_number ?? null,
-    department: payload.user.department ?? null,
-    profileImage: payload.user.avatar_url ?? null,
-    dietaryPreference: "both",
-    createdAt: payload.user.created_at ?? null,
-    updatedAt: payload.user.updated_at ?? null,
-    accessToken: payload.access_token,
-  };
+  const payload = backendTokenSchema.parse(await response.json());
+  return mapBackendTokenToSessionUser(payload);
 }
 
 export function useAuth() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: user, isLoading, error } = useQuery<User | null>({
-    queryKey: [api.auth.me.path],
+  const { data: user, isLoading, error } = useQuery<SessionUser | null>({
+    queryKey: ["auth", "me"],
     queryFn: async () => {
-      const res = await fetch(api.auth.me.path, { credentials: "include" });
-      if (res.status === 401) return null;
-      if (!res.ok) return null;
-      return api.auth.me.responses[200].parse(await res.json());
+      const token = getAccessToken();
+      if (!token) return null;
+
+      const response = await fetch(withApiOrigin("/auth/me"), {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 401) {
+        clearAccessToken();
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error(await extractApiErrorMessage(response, "Unable to load current user"));
+      }
+
+      return mapBackendUserToSessionUser(backendUserSchema.parse(await response.json()), token);
     },
     retry: false,
   });
 
-  useEffect(() => {
-    if (!user || user.role !== "student") {
-      clearAccessToken();
-      return;
+  function handleAuthSuccess(data: SessionUser, title: string, description: string) {
+    if (data.accessToken) {
+      setAccessToken(data.accessToken);
     }
 
-    void ensureStudentAccessToken();
-  }, [user?.id, user?.role]);
-
-  function handleAuthSuccess(data: AuthUser, title: string, description: string) {
-    queryClient.setQueryData([api.auth.me.path], toPublicUser(data));
-
-    if (data.role === "student") {
-      if (data.accessToken) {
-        setAccessToken(data.accessToken);
-      } else {
-        void ensureStudentAccessToken();
-      }
-    }
-
-    toast({
-      title,
-      description,
-    });
+    queryClient.setQueryData(["auth", "me"], { ...data, accessToken: undefined });
+    toast({ title, description });
   }
 
   const loginMutation = useMutation({
-    mutationFn: async (credentials: LoginInput) => {
-      const res = await fetch(api.auth.login.path, {
-        method: api.auth.login.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const message = await extractApiErrorMessage(
-          res,
-          "Invalid username or password",
-        );
-        throw new Error(message);
-      }
-
-      return api.auth.login.responses[200].parse(await res.json());
-    },
+    mutationFn: loginAgainstBackend,
     onSuccess: (data) => {
       handleAuthSuccess(data, "Welcome back", `Logged in as ${data.username}`);
     },
@@ -138,22 +121,30 @@ export function useAuth() {
 
   const registerMutation = useMutation({
     mutationFn: async (payload: RegisterInput) => {
-      const res = await fetch(api.auth.register.path, {
-        method: api.auth.register.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        credentials: "include",
+      const response = await fetch(withApiOrigin("/auth/register"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          username: payload.username,
+          email: payload.email,
+          full_name: payload.name,
+          password: payload.password,
+          role: payload.role,
+        }),
       });
 
-      if (!res.ok) {
-        const message = await extractApiErrorMessage(res, "Registration failed");
-        throw new Error(message);
+      if (!response.ok) {
+        throw new Error(await extractApiErrorMessage(response, "Registration failed"));
       }
 
-      return api.auth.register.responses[201].parse(await res.json());
+      await backendUserSchema.parseAsync(await response.json());
+      return loginAgainstBackend({ username: payload.username, password: payload.password });
     },
     onSuccess: (data) => {
-      handleAuthSuccess(data, "Account created", "Welcome to Canteen Connect");
+      handleAuthSuccess(data, "Account created", "Welcome to CanteenConnect");
     },
     onError: (error: Error) => {
       toast({
@@ -164,48 +155,12 @@ export function useAuth() {
     },
   });
 
-  const googleLoginMutation = useMutation({
-    mutationFn: async (credential: string) => {
-      const res = await fetch(api.auth.google.path, {
-        method: api.auth.google.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const message = await extractApiErrorMessage(res, "Google sign-in failed");
-        throw new Error(message);
-      }
-
-      if (res.status === 201) {
-        return toAuthUserFromGoogle(api.auth.google.responses[201].parse(await res.json()));
-      }
-
-      return toAuthUserFromGoogle(api.auth.google.responses[200].parse(await res.json()));
-    },
-    onSuccess: (data) => {
-      handleAuthSuccess(data, "Google sign-in successful", `Logged in as ${data.username}`);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Google sign-in failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await fetch(api.auth.logout.path, {
-        method: api.auth.logout.method,
-        credentials: "include",
-      });
+      clearAccessToken();
     },
     onSuccess: () => {
       clearAccessToken();
-      queryClient.setQueryData([api.auth.me.path], null);
       queryClient.clear();
       toast({
         title: "Logged out",
@@ -222,8 +177,6 @@ export function useAuth() {
     isLoggingIn: loginMutation.isPending,
     register: registerMutation.mutate,
     isRegistering: registerMutation.isPending,
-    loginWithGoogle: googleLoginMutation.mutate,
-    isGoogleLoggingIn: googleLoginMutation.isPending,
     logout: logoutMutation.mutate,
   };
 }

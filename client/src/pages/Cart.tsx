@@ -21,6 +21,7 @@ export default function Cart() {
 
     createOrder(
       {
+        outletId: items[0]?.outletId,
         items: items.map((item) => ({
           productId: item.id,
           quantity: item.quantity,

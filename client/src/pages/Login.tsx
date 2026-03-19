@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation, Link } from "wouter";
-import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,15 +25,14 @@ import {
 } from "@/components/ui/form";
 
 const loginSchema = z.object({
-  username: z.string().trim().min(1, "Username is required"),
+  username: z.string().trim().min(1, "Username or email is required"),
   password: z.string().min(1, "Password is required"),
 });
 
 export default function Login() {
-  const { login, loginWithGoogle, isLoggingIn, isGoogleLoggingIn, user } = useAuth();
+  const { login, isLoggingIn, user } = useAuth();
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
-  const isAuthenticating = isLoggingIn || isGoogleLoggingIn;
 
   useEffect(() => {
     if (user) {
@@ -106,7 +104,7 @@ export default function Login() {
                       <FormLabel>Username</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="student1"
+                          placeholder="student1 or you@example.com"
                           autoComplete="username"
                           {...field}
                           className="h-11 rounded-xl"
@@ -148,7 +146,7 @@ export default function Login() {
                 <Button
                   type="submit"
                   className="h-11 w-full rounded-xl text-base font-semibold"
-                  disabled={isAuthenticating || !form.formState.isValid}
+                  disabled={isLoggingIn || !form.formState.isValid}
                 >
                   {isLoggingIn ? (
                     <>
@@ -159,21 +157,6 @@ export default function Login() {
                     "Sign In"
                   )}
                 </Button>
-
-                <div className="relative py-2">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border/60" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                    <span className="bg-card px-3">Or continue with</span>
-                  </div>
-                </div>
-
-                <GoogleAuthButton
-                  text="signin_with"
-                  disabled={isAuthenticating}
-                  onCredential={loginWithGoogle}
-                />
               </form>
             </Form>
           </CardContent>

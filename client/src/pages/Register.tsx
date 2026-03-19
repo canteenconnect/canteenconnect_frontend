@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation, Link } from "wouter";
-import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -14,13 +13,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 const registerSchema = z
   .object({
     name: z.string().trim().min(2, "Full name is required"),
+    email: z.string().trim().email("Valid email is required"),
     username: z
       .string()
       .trim()
       .min(3, "Username must be at least 3 characters")
       .regex(/^[a-zA-Z0-9_.-]+$/, "Username can only include letters, numbers, _, ., -"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string().min(6, "Please confirm your password"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(8, "Please confirm your password"),
     role: z.literal("student"),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -29,9 +29,8 @@ const registerSchema = z
   });
 
 export default function Register() {
-  const { register, loginWithGoogle, isRegistering, isGoogleLoggingIn, user } = useAuth();
+  const { register, isRegistering, user } = useAuth();
   const [, setLocation] = useLocation();
-  const isAuthenticating = isRegistering || isGoogleLoggingIn;
 
   useEffect(() => {
     if (user) {
@@ -44,6 +43,7 @@ export default function Register() {
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      email: "",
       username: "",
       password: "",
       confirmPassword: "",
@@ -55,10 +55,7 @@ export default function Register() {
   function onSubmit(values: z.infer<typeof registerSchema>) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { confirmPassword, ...data } = values;
-    register({
-      ...data,
-      dietaryPreference: "both",
-    });
+    register(data);
   }
 
   return (
@@ -102,6 +99,25 @@ export default function Register() {
                 />
                 <FormField
                   control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="student@campus.edu"
+                          autoComplete="email"
+                          {...field}
+                          className="h-11 rounded-xl"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="password"
                   render={({ field }) => (
                     <FormItem>
@@ -129,7 +145,7 @@ export default function Register() {
                 <Button
                   type="submit"
                   className="h-11 w-full rounded-xl text-base font-semibold"
-                  disabled={isAuthenticating}
+                  disabled={isRegistering}
                 >
                   {isRegistering ? (
                     <>
@@ -140,21 +156,6 @@ export default function Register() {
                     "Register"
                   )}
                 </Button>
-
-                <div className="relative py-2">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border/60" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                    <span className="bg-card px-3">Or create with</span>
-                  </div>
-                </div>
-
-                <GoogleAuthButton
-                  text="signup_with"
-                  disabled={isAuthenticating}
-                  onCredential={loginWithGoogle}
-                />
               </form>
             </Form>
           </CardContent>
