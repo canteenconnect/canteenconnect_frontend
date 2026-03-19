@@ -9,12 +9,13 @@ export const backendUserSchema = z.object({
   full_name: z.string(),
   role: z.string(),
   is_active: z.boolean(),
-  created_at: z.string().datetime().or(z.date()),
-  updated_at: z.string().datetime().or(z.date()),
+  created_at: z.string().datetime().or(z.date()).nullable().optional(),
+  updated_at: z.string().datetime().or(z.date()).nullable().optional(),
 });
 
 export const backendTokenSchema = z.object({
   access_token: z.string(),
+  refresh_token: z.string(),
   token_type: z.string(),
   user: backendUserSchema,
 });
@@ -67,6 +68,7 @@ export type SessionUser = {
   createdAt: string | null;
   updatedAt: string | null;
   accessToken?: string;
+  refreshToken?: string;
 };
 
 export type CatalogProduct = Product & {
@@ -129,7 +131,7 @@ function normalizeOrderStatus(status: string): FrontendOrder["status"] {
 
 export function mapBackendUserToSessionUser(
   user: z.infer<typeof backendUserSchema>,
-  accessToken?: string,
+  tokens?: { accessToken?: string; refreshToken?: string },
 ): SessionUser {
   const fullName = user.full_name || user.username;
 
@@ -153,14 +155,18 @@ export function mapBackendUserToSessionUser(
       user.updated_at instanceof Date
         ? user.updated_at.toISOString()
         : user.updated_at ?? null,
-    accessToken,
+    accessToken: tokens?.accessToken,
+    refreshToken: tokens?.refreshToken,
   };
 }
 
 export function mapBackendTokenToSessionUser(
   payload: z.infer<typeof backendTokenSchema>,
 ): SessionUser {
-  return mapBackendUserToSessionUser(payload.user, payload.access_token);
+  return mapBackendUserToSessionUser(payload.user, {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token,
+  });
 }
 
 export function mapBackendMenuItemToProduct(

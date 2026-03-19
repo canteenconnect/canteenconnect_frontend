@@ -8,7 +8,13 @@ import {
   mapBackendUserToSessionUser,
   type SessionUser,
 } from "@/lib/api/fastapiAdapters";
-import { clearAccessToken, getAccessToken, setAccessToken } from "@/lib/api/tokenStore";
+import {
+  clearSessionTokens,
+  getAccessToken,
+  getRefreshToken,
+  setSessionTokens,
+} from "@/lib/api/tokenStore";
+import { ensureStudentAccessToken } from "@/lib/api/client";
 
 type LoginInput = {
   username: string;
@@ -72,7 +78,7 @@ export function useAuth() {
   const { data: user, isLoading, error } = useQuery<SessionUser | null>({
     queryKey: ["auth", "me"],
     queryFn: async () => {
-      const token = getAccessToken();
+      const token = await ensureStudentAccessToken();
       if (!token) return null;
 
       const response = await fetch(withApiOrigin("/auth/me"), {
@@ -83,7 +89,7 @@ export function useAuth() {
       });
 
       if (response.status === 401) {
-        clearAccessToken();
+        clearSessionTokens();
         return null;
       }
 
@@ -97,11 +103,16 @@ export function useAuth() {
   });
 
   function handleAuthSuccess(data: SessionUser, title: string, description: string) {
-    if (data.accessToken) {
-      setAccessToken(data.accessToken);
-    }
+    setSessionTokens({
+      accessToken: data.accessToken ?? null,
+      refreshToken: data.refreshToken ?? null,
+    });
 
-    queryClient.setQueryData(["auth", "me"], { ...data, accessToken: undefined });
+    queryClient.setQueryData(["auth", "me"], {
+      ...data,
+      accessToken: undefined,
+      refreshToken: undefined,
+    });
     toast({ title, description });
   }
 
@@ -157,15 +168,37 @@ export function useAuth() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      clearAccessToken();
+      const accessToken = getAccessToken();
+      const refreshToken = getRefreshToken();
+
+      if (!accessToken) {
+        clearSessionTokens();
+        return;
+      }
+
+      await fetch(withApiOrigin("/auth/logout"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          refresh_token: refreshToken ?? null,
+        }),
+      }).catch(() => undefined);
     },
     onSuccess: () => {
-      clearAccessToken();
+      clearSessionTokens();
       queryClient.clear();
       toast({
         title: "Logged out",
         description: "See you soon.",
       });
+    },
+    onError: () => {
+      clearSessionTokens();
+      queryClient.clear();
     },
   });
 
